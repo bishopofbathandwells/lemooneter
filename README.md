@@ -4,6 +4,21 @@ A moon-phase tracker that recreates a 15-year-old Symbian app of the same name (
 
 Built as a vanilla **Progressive Web App** — no framework, no build step. Installs on Android (Chrome) and iOS (Safari) via *Add to Home Screen*, no app store required.
 
+**Live**: <https://bishopofbathandwells.github.io/lemooneter/>
+**Repo**: <https://github.com/bishopofbathandwells/lemooneter>
+
+---
+
+## Install on your phone
+
+It's a Progressive Web App — no Play Store, no App Store, no APK to sideload.
+
+**Android (Chrome)** — open the live URL → tap the ⋮ menu → **Add to Home Screen**. The app icon lands on your home screen and launches full-screen, looking and behaving like a native app.
+
+**iOS (Safari)** — open the live URL → tap the Share icon → **Add to Home Screen**. Same result. (Other iOS browsers can't install PWAs; you must use Safari for the install step. Once installed, it works independently.)
+
+Updates are automatic: every `git push` triggers a GitHub Pages redeploy within ~30 seconds, and the installed app picks up the new version on next launch.
+
 ---
 
 ## Features
@@ -79,17 +94,14 @@ lemooneter/
 ├── icon-maskable.svg            (Android adaptive icon)
 ├── tools/
 │   └── prepare_image.py         (offline image preprocessing — black-bg source → WebP)
-├── fruits/                      (processed runtime assets)
-│   ├── moon.webp
-│   ├── lemon.webp
-│   ├── lime.webp
-│   ├── orange.webp
-│   ├── cheese-moon.webp
-│   ├── smiley.webp
-│   └── watermelon.webp
-├── raw-fruits/                  (original sources, dev-only — exclude from deploy)
-│   └── *.jpg
-└── tmp/                         (screenshots, dev-only — exclude from deploy)
+└── fruits/                      (processed runtime assets)
+    ├── moon.webp
+    ├── lemon.webp
+    ├── lime.webp
+    ├── orange.webp
+    ├── cheese-moon.webp
+    ├── smiley.webp
+    └── watermelon.webp
 ```
 
 ---
@@ -139,15 +151,21 @@ Cross-checked against published NASA new/full moons (see `tests.html`). Because 
 ## How to run locally
 
 ```bash
+git clone https://github.com/bishopofbathandwells/lemooneter.git
 cd lemooneter
 python -m http.server 8765 --bind 127.0.0.1
 # open http://127.0.0.1:8765/
 ```
 
-A few things to know:
+To test from another device on the same Wi-Fi (e.g. your phone), bind to all interfaces:
+```bash
+python -m http.server 8765 --bind 0.0.0.0
+# then open http://<your-laptop-ip>:8765/ on the phone
+```
 
+A few things to know:
 - Loading from `file://` works for everything **except** service-worker registration — install / offline only kick in over `http(s)://`.
-- The image preprocessing script lives inline in the chat history; it's not committed as a `.py` file yet (TODO).
+- After making changes, always **hard-refresh** (Ctrl+Shift+R) so the service worker picks up the new cache version.
 
 ---
 
@@ -182,23 +200,18 @@ A few things to know:
 ## What's left for "release"
 
 ### Must
-- [ ] **Host on a real HTTPS domain** — Cloudflare Pages / Netlify / GitHub Pages. Without HTTPS the service worker won't register, so installs won't work.
 - [ ] **Full PWA icon set** — currently just `icon.svg` and `icon-maskable.svg`. Add raster PNGs at 192, 256, 384, 512 px in the manifest. iOS needs `apple-touch-icon` at multiple sizes (180, 152, 120). Android adaptive icon needs separate foreground + background.
 - [ ] **Photo attribution** — the full moon photo (`raw-fruits/moon.jpg`) is Wikipedia's `1280px-FullMoon2010.jpg`; check the licence and credit Gregory H. Revera (the original photographer) per the CC-BY-SA terms.
-- [ ] **Real-device testing** — iPhone Safari install + use, Android Chrome install + use, at least one tablet.
-- [ ] **Deploy hygiene** — exclude `raw-fruits/`, `tmp/`, `tests.html`, and `README.md` from the deployed bundle. They're dev-only.
-- [ ] **Cache-key discipline** — every deploy that changes any cached asset must bump the `CACHE` constant in `sw.js`. Without this, returning users keep stale code.
+- [ ] **iOS Safari real-device testing** — Android Chrome confirmed working. iPhone Safari install + use still pending.
 
 ### Should
-- [ ] **Southern-hemisphere flip** — phases visually mirror at southern latitudes; toggle (manual or auto from location) inverts `sx` in the shader.
-- [ ] **Phase-event markers in the calendar** — small new/full/quarter icons or labels on those days.
-- [ ] **Phase-math tests** — sanity tests for `moonPhaseFraction`, `illumination`, `phaseName`, and a handful of historical/future new/full/quarter dates from reliable sources.
 - [ ] **Update-available toast** — when a new SW activates, surface a "Reload to update" hint. Currently the cache flips silently on next reload.
 - [ ] **Error states** — what happens if a WebP fetch fails? Empty canvas. Fall back to a placeholder or retry.
 - [ ] **Accessibility audit** — keyboard navigation through the day-nav, focus rings, screen-reader labels on the canvas (currently has `aria-label`).
 
 ### Nice to have
 - [ ] **Performance** — first load is ~600 KB of WebPs. Could lazy-load all but the active subject.
+- [ ] **Improve phase-math accuracy** — current model drifts up to ~13 hours over a few years. Adding 2-3 Meeus terms (sun mean-anomaly correction, evection, moon longitude perturbation) gets it to ~1 hour without much more code.
 - [ ] **Share image** button — render the current Today view as PNG and trigger the share sheet on mobile.
 
 ---
@@ -232,13 +245,12 @@ Pros: zero cost, fully offline (assets bundled), versioned binary you control. C
 ### 3. Trusted Web Activity (TWA, $25 once, Play Store)
 Wraps the hosted PWA in a thin Android shell using Chrome Custom Tabs. The PWA runs in Chrome under the hood, so content updates ship instantly without a new APK.
 
-Steps:
-1. Host the PWA on a real HTTPS domain.
-2. `npm i -g @bubblewrap/cli`.
-3. `bubblewrap init --manifest=https://your-domain/manifest.webmanifest`.
-4. Set up Digital Asset Links (`assetlinks.json` at your domain) so Android verifies the PWA matches the app.
-5. `bubblewrap build` → unsigned `.aab`. Sign with `keytool` + `jarsigner`.
-6. Pay the **one-time $25 Google Play Developer fee**, upload the AAB.
+Steps (the hosted PWA is already at <https://bishopofbathandwells.github.io/lemooneter/>):
+1. `npm i -g @bubblewrap/cli`.
+2. `bubblewrap init --manifest=https://bishopofbathandwells.github.io/lemooneter/manifest.webmanifest`.
+3. Set up Digital Asset Links (`assetlinks.json` at the domain root) so Android verifies the PWA matches the app. *Hosting the file at the right path under github.io is fiddly; a custom domain is easier.*
+4. `bubblewrap build` → unsigned `.aab`. Sign with `keytool` + `jarsigner`.
+5. Pay the **one-time $25 Google Play Developer fee**, upload the AAB.
 
 Pros: tiny shell, web-style update cadence. Cons: requires public HTTPS hosting and a Play Store account.
 
@@ -251,6 +263,21 @@ Same Capacitor setup as #2, but signed with a release key, uploaded to Play Stor
 - **For Play Store + planned native APIs (camera, notifications)**: path 4 (Capacitor + Play Store).
 
 For iOS, the equivalent of path 2 doesn't exist — Apple's sideloading restrictions mean any "real app" needs the **Apple Developer Program ($99/year)** and TestFlight (free for testers, but you need the dev account to publish). The free path remains *Add to Home Screen* in Safari.
+
+---
+
+## Deploy flow
+
+The repo is wired to GitHub Pages:
+
+1. Make changes locally.
+2. Run a local server (`python -m http.server 8765 --bind 127.0.0.1`) and hard-refresh to verify.
+3. **Bump `CACHE` in `sw.js`** if any cached asset changed (HTML/CSS/JS/icons/WebPs/`astro.js`). Without this, returning users keep the old code.
+4. `git add` the modified files, commit with a meaningful message, `git push`.
+5. GitHub Pages picks up the change and redeploys in ~30 seconds. The Settings → Pages tab in the repo shows build status.
+6. The installed PWA on devices picks up the new version on the *next* launch (or after a foreground reload — the service worker installs new assets in the background, activates them when all open tabs close).
+
+If a friend installed the PWA and isn't seeing your latest changes, ask them to fully close the app (swipe it away from Recents on Android, force-quit on iOS) and reopen. That triggers the SW activate step.
 
 ---
 
@@ -269,3 +296,6 @@ Originally requested as a recreation of a Symbian/early-Android app called *Lemo
 9. Subject dropdown in topbar.
 10. Custom-photo crop preview with drag-to-pan + wheel/pinch-zoom.
 11. Day navigation + autoplay.
+12. Southern-hemisphere toggle; new/quarter/full markers in the calendar; `astro.js` extraction + `tests.html`; `tools/prepare_image.py` committed.
+13. Squashed-canvas + long-date fixes on phones.
+14. **Pushed to GitHub and deployed to GitHub Pages** — <https://bishopofbathandwells.github.io/lemooneter/>.
