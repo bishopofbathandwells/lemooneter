@@ -1,0 +1,42 @@
+# Dev-only — screenshots from iteration
+tmp/
+
+# Dev-only — original source photos. The processed WebPs in fruits/ are what
+# the app uses; the raw files aren't needed at runtime. Add back if you'd
+# like to share them.
+raw-fruits/
+
+# In case we later add a Capacitor / Node-based build step
+node_modules/
+package-lock.json
+yarn.lock
+
+# Capacitor / Android build artifacts (if/when we add native wrapping)
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/.idea/
+android/captures/
+android/.cxx/
+*.apk
+*.aab
+*.keystore
+
+# OS junk
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor temp files
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+
+# Python tooling (the prepare_image.py script doesn't need anything cached here)
+__pycache__/
+*.pyc
+.venv/
+venv/

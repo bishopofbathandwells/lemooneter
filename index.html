@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<title>Lemooneter (It's Fruitometry!)</title>
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon.svg">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Lemooneter">
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<header class="topbar">
+  <h1>Lemooneter <span class="topbar-sub">(It's Fruitometry!)</span></h1>
+  <div class="topbar-controls">
+    <select id="subjectSelect" class="subject-select" aria-label="Subject"></select>
+    <button id="settingsBtn" class="icon-btn" aria-label="Settings">⚙︎</button>
+  </div>
+</header>
+
+<main id="pager" class="pager">
+  <section class="page" id="todayPage" aria-label="Today">
+    <div class="today-wrap">
+      <canvas id="todayCanvas" width="1024" height="1024" aria-label="Current phase"></canvas>
+      <div class="today-info">
+        <div id="phaseName" class="phase-name">—</div>
+        <div id="illumPct" class="illum">— %</div>
+        <div class="day-nav">
+          <button id="prevDay" class="icon-btn" aria-label="Previous day">‹</button>
+          <button id="dateBtn" class="date-btn" type="button" aria-label="Pick a date">
+            <span id="todayDate" class="date">—</span>
+          </button>
+          <button id="todayDayBtn" class="cal-today-btn" type="button">Today</button>
+          <button id="nextDay" class="icon-btn" aria-label="Next day">›</button>
+          <input type="date" id="dateInput" class="hidden-date-input" tabindex="-1" aria-hidden="true">
+        </div>
+        <div class="counters">
+          <div><span class="count-label">Next full</span><span id="nextFull">—</span></div>
+          <div><span class="count-label">Next new</span><span id="nextNew">—</span></div>
+          <div>
+            <span class="count-label">Autoplay</span>
+            <button id="autoplayBtn" class="autoplay-pill" type="button" aria-label="Start autoplay">
+              <span id="apIcon">▶</span><span id="apLabel">10 d</span>
+            </button>
+          </div>
+        </div>
+        <div id="riseSet" class="riseset">
+          <button id="locBtn" class="link-btn">Enable rise/set times</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="page" id="calendarPage" aria-label="Calendar">
+    <div class="cal-sticky">
+      <div class="cal-head">
+        <button id="prevMonth" class="icon-btn" aria-label="Previous month">‹</button>
+        <h2 id="monthLabel">—</h2>
+        <button id="todayBtn" class="cal-today-btn">Today</button>
+        <button id="nextMonth" class="icon-btn" aria-label="Next month">›</button>
+      </div>
+      <div class="cal-dow">
+        <span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span>
+      </div>
+    </div>
+    <div id="calGrid" class="cal-grid"></div>
+  </section>
+</main>
+
+<nav class="dots" role="tablist">
+  <button class="dot active" data-page="0" aria-label="Today"></button>
+  <button class="dot" data-page="1" aria-label="Calendar"></button>
+</nav>
+
+<dialog id="settingsDlg" class="settings">
+  <form method="dialog">
+    <h2>Settings</h2>
+
+    <fieldset>
+      <legend>Mode</legend>
+      <label><input type="radio" name="mode" value="moon"> Moon</label>
+      <label><input type="radio" name="mode" value="lemon"> Lemon</label>
+      <label><input type="radio" name="mode" value="lime"> Lime</label>
+      <label><input type="radio" name="mode" value="orange"> Orange</label>
+      <label><input type="radio" name="mode" value="cheese-moon"> Cheese moon</label>
+      <label><input type="radio" name="mode" value="smiley"> Smiley</label>
+      <label><input type="radio" name="mode" value="watermelon"> Watermelon</label>
+      <label><input type="radio" name="mode" value="custom"> Custom photo</label>
+    </fieldset>
+
+    <fieldset>
+      <legend>Custom photo</legend>
+      <input id="photoInput" type="file" accept="image/*">
+      <button id="clearPhoto" type="button" class="link-btn">Clear</button>
+      <canvas id="cropPreview" class="crop-preview" width="240" height="240" aria-label="Crop preview — drag to pan"></canvas>
+      <p class="muted crop-hint" id="cropHint" hidden>Drag to position the photo inside the disc.</p>
+    </fieldset>
+
+    <fieldset>
+      <legend>Hemisphere</legend>
+      <label><input type="radio" name="hemisphere" value="auto"> Auto (from location)</label>
+      <label><input type="radio" name="hemisphere" value="north"> Northern</label>
+      <label><input type="radio" name="hemisphere" value="south"> Southern (mirror phases)</label>
+    </fieldset>
+
+    <fieldset>
+      <legend>Autoplay</legend>
+      <label class="numfield">Days forward
+        <input id="apDays" type="number" min="1" max="365" step="1" value="10">
+      </label>
+      <label class="numfield">Delay per day (ms)
+        <input id="apDelay" type="number" min="100" max="10000" step="100" value="1000">
+      </label>
+    </fieldset>
+
+    <fieldset>
+      <legend>Location</legend>
+      <p class="muted">Used only to compute moon rise/set, stored locally.</p>
+      <div id="locStatus" class="muted">No location set.</div>
+      <button id="useGeo" type="button" class="link-btn">Use my location</button>
+      <button id="clearGeo" type="button" class="link-btn">Clear</button>
+    </fieldset>
+
+    <menu class="dlg-actions">
+      <button value="close">Close</button>
+    </menu>
+  </form>
+</dialog>
+
+<script src="app.js" type="module"></script>
+</body>
+</html>

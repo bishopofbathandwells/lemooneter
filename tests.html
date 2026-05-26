@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Lemooneter — astronomy tests</title>
+<style>
+  body { font-family: -apple-system, "Segoe UI", Roboto, sans-serif; background: #0a0a14; color: #e8e8f3; padding: 20px; max-width: 1100px; margin: 0 auto; }
+  h1 { font-size: 22px; margin-bottom: 4px; }
+  .muted { color: #8a8fa8; }
+  .pass { color: #6fc18a; font-weight: 600; }
+  .fail { color: #ff7a7a; font-weight: 600; }
+  table { border-collapse: collapse; margin-top: 14px; width: 100%; }
+  th, td { padding: 5px 10px; text-align: left; border-bottom: 1px solid #232540; font-size: 13px; }
+  th { color: #b3b6c8; font-weight: 600; }
+  td.num { font-family: ui-monospace, Menlo, Consolas, monospace; }
+  #summary { font-size: 16px; padding: 10px 14px; border-radius: 8px; background: #11132a; margin-top: 12px; }
+  .summary-pass { color: #6fc18a; }
+  .summary-fail { color: #ff7a7a; }
+  h2 { font-size: 16px; margin-top: 28px; }
+</style>
+</head>
+<body>
+<h1>Lemooneter astronomy tests</h1>
+<p class="muted">Cross-checks <code>moonPhaseFraction</code> against published lunar event times.<br>
+Tolerance: ±0.02 phase fraction (≈ ±14 hours). Our model is a simple mean-cycle approximation (no perturbation terms), so it can drift by up to ~13 hours over a couple of years.
+Adding 2-3 higher-order terms from Meeus would tighten this to ~1 hour if desired.</p>
+
+<div id="summary">Running…</div>
+
+<h2>Phase events (new / quarter / full)</h2>
+<table id="results">
+  <thead><tr><th>UTC time</th><th>Expected</th><th>Computed phase</th><th>Δ (hours)</th><th>Result</th></tr></thead>
+  <tbody></tbody>
+</table>
+
+<h2>Illumination</h2>
+<table id="illum-results">
+  <thead><tr><th>Phase</th><th>Expected illumination</th><th>Computed</th><th>Result</th></tr></thead>
+  <tbody></tbody>
+</table>
+
+<h2>Phase names</h2>
+<table id="name-results">
+  <thead><tr><th>Phase fraction</th><th>Expected name</th><th>Computed name</th><th>Result</th></tr></thead>
+  <tbody></tbody>
+</table>
+
+<h2>phaseEventOnDay sanity</h2>
+<table id="event-results">
+  <thead><tr><th>Date (local)</th><th>Expected target</th><th>Computed</th><th>Result</th></tr></thead>
+  <tbody></tbody>
+</table>
+
+<script type="module">
+import {
+  SYNODIC,
+  moonPhaseFraction,
+  illumination,
+  phaseName,
+  phaseEventOnDay,
+} from "./astro.js";
+
+const TOL_PHASE = 0.02;          // ≈ 14.2 hours — generous, matches the simplified model's worst case
+const TOL_ILLUM = 0.01;          // 1% illumination
+
+// Sources: NASA Moon Phase Service & timeanddate.com. Times in UTC.
+const events = [
+  ["2024-01-11T11:57Z", "new"],
+  ["2024-01-18T03:53Z", "q1"],
+  ["2024-01-25T17:54Z", "full"],
+  ["2024-02-02T23:18Z", "q3"],
+  ["2024-02-09T22:59Z", "new"],
+  ["2024-02-24T12:30Z", "full"],
+  ["2024-03-10T09:00Z", "new"],
+  ["2024-03-17T04:11Z", "q1"],
+  ["2024-03-25T07:00Z", "full"],
+  ["2024-04-01T03:15Z", "q3"],
+  ["2024-04-08T18:21Z", "new"],   // total solar eclipse
+  ["2024-04-23T23:49Z", "full"],
+  ["2024-05-08T03:22Z", "new"],
+  ["2024-05-23T13:53Z", "full"],
+  ["2024-06-06T12:38Z", "new"],
+  ["2024-06-22T01:08Z", "full"],
+  ["2024-07-05T22:57Z", "new"],
+  ["2024-07-21T10:17Z", "full"],
+  ["2024-08-04T11:13Z", "new"],
+  ["2024-08-19T18:26Z", "full"],
+  ["2025-01-13T22:27Z", "full"],
+  ["2025-03-14T06:55Z", "full"],
+  ["2025-09-07T18:09Z", "full"],
+  ["2026-01-03T10:03Z", "full"],
+  ["2026-05-31T08:45Z", "full"],
+];
+const targets = { new: 0, q1: 0.25, full: 0.5, q3: 0.75 };
+const labels  = { new: "New",     q1: "First quarter", full: "Full",   q3: "Last quarter" };
+
+let pass = 0, total = 0;
+const row = (tbody, cells, ok) => {
+  const tr = document.createElement("tr");
+  for (const c of cells) {
+    const td = document.createElement("td");
+    td.innerHTML = c;
+    if (typeof c === "string" && /^[\-0-9.]+$/.test(c)) td.classList.add("num");
+    tr.appendChild(td);
+  }
+  const v = tr.lastChild;
+  v.classList.add(ok ? "pass" : "fail");
+  v.textContent = ok ? "PASS" : "FAIL";
+  tbody.appendChild(tr);
+};
+
+const tbody = document.querySelector("#results tbody");
+for (const [iso, name] of events) {
+  total++;
+  const phase = moonPhaseFraction(new Date(iso));
+  const target = targets[name];
+  let delta = phase - target;
+  if (delta > 0.5) delta -= 1;
+  if (delta < -0.5) delta += 1;
+  const ok = Math.abs(delta) <= TOL_PHASE;
+  if (ok) pass++;
+  const dh = (delta * SYNODIC * 24).toFixed(2);
+  row(tbody, [iso, `${labels[name]} (${target})`, phase.toFixed(5), dh + " h", ""], ok);
+}
+
+// Illumination spot checks
+const illumTbody = document.querySelector("#illum-results tbody");
+const illumCases = [
+  [0,    0],
+  [0.25, 0.5],
+  [0.5,  1],
+  [0.75, 0.5],
+  [0.125, 0.146],   // half-way to first quarter
+  [0.625, 0.854],   // waning gibbous mid-way
+];
+for (const [phase, expected] of illumCases) {
+  total++;
+  const got = illumination(phase);
+  const ok = Math.abs(got - expected) <= TOL_ILLUM;
+  if (ok) pass++;
+  row(illumTbody, [phase.toString(), expected.toString(), got.toFixed(4), ""], ok);
+}
+
+// Phase names at canonical fractions
+const nameTbody = document.querySelector("#name-results tbody");
+const nameCases = [
+  [0,     "New moon"],
+  [0.05,  "Waxing crescent"],
+  [0.25,  "First quarter"],
+  [0.4,   "Waxing gibbous"],
+  [0.5,   "Full moon"],
+  [0.6,   "Waning gibbous"],
+  [0.75,  "Last quarter"],
+  [0.9,   "Waning crescent"],
+  [0.999, "New moon"],
+];
+for (const [phase, expected] of nameCases) {
+  total++;
+  const got = phaseName(phase);
+  const ok = got === expected;
+  if (ok) pass++;
+  row(nameTbody, [phase.toString(), expected, got, ""], ok);
+}
+
+// phaseEventOnDay: a day with a full moon should detect it; a non-event day
+// should return null.
+const eventTbody = document.querySelector("#event-results tbody");
+const eventCases = [
+  // Use noon-local Dates so the local-day window of the helper contains the
+  // UTC event time (results may vary by host timezone for events near midnight).
+  [new Date(2024, 5, 22, 12), 0.5,  "Full on Jun 22 2024"],
+  [new Date(2024, 0, 11, 12), 0,    "New on Jan 11 2024"],
+  [new Date(2024, 0, 18, 12), 0.25, "1Q on Jan 18 2024"],
+  [new Date(2024, 0, 14, 12), null, "Mid-cycle day (no event)"],
+];
+for (const [date, expected, desc] of eventCases) {
+  total++;
+  const got = phaseEventOnDay(date);
+  const ok = got === expected;
+  if (ok) pass++;
+  row(eventTbody, [date.toDateString(), desc + (expected != null ? ` → ${expected}` : ""), String(got), ""], ok);
+}
+
+const summary = document.querySelector("#summary");
+const allPass = pass === total;
+summary.innerHTML = `<span class="${allPass ? 'summary-pass' : 'summary-fail'}">${pass} / ${total} tests passed</span>`;
+</script>
+</body>
+</html>
