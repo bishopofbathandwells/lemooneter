@@ -316,6 +316,15 @@ async function loadBuiltInAssets() {
 
 // ───────────────────────────────────────────────────────── views
 
+// Compact date string like "Sat 23 May 2026". Built piece-by-piece so the
+// order and lack of punctuation are stable across locales (en-GB, en-US,
+// and others all differ in comma placement and weekday-vs-month order).
+function shortDateLabel(d) {
+  const wk = d.toLocaleDateString(undefined, { weekday: "short" });
+  const mo = d.toLocaleDateString(undefined, { month: "short" });
+  return `${wk} ${d.getDate()} ${mo} ${d.getFullYear()}`;
+}
+
 function viewedDateOrNow() {
   return state.viewedDate ? new Date(state.viewedDate) : new Date();
 }
@@ -334,7 +343,7 @@ function renderToday() {
   renderPhaseTo($("#todayCanvas"), phase, state.mode, state.customImage, state.builtIn);
   $("#phaseName").textContent = phaseName(phase);
   $("#illumPct").textContent = Math.round(illumination(phase) * 100) + " % illuminated";
-  $("#todayDate").textContent = now.toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+  $("#todayDate").textContent = shortDateLabel(now);
   $("#nextFull").textContent = formatDuration(daysUntilFractional(now, 0.5));
   $("#nextNew").textContent  = formatDuration(daysUntilFractional(now, 0.0));
   renderRiseSet(now);

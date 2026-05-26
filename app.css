@@ -287,14 +287,23 @@ body {
 .cal-cell.muted { opacity: 0.35; }
 .cal-cell canvas {
   position: absolute;
-  inset: 4px 4px 18px;
+  top: 4px;
+  left: 4px;
   width: calc(100% - 8px);
-  height: calc(100% - 22px);
+  height: calc(100% - 8px);   /* equal padding all sides -> square canvas */
 }
 .cal-cell .num {
+  position: absolute;
+  bottom: 3px;
+  left: 50%;
+  transform: translateX(-50%);
   font-size: 12px;
   font-weight: 600;
   color: var(--fg);
+  background: rgba(0, 0, 0, 0.55);
+  padding: 0 6px;
+  border-radius: 999px;
+  line-height: 1.4;
   z-index: 1;
 }
 .cal-cell.muted .num { color: var(--muted); font-weight: 400; }

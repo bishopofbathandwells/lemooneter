@@ -1,5 +1,5 @@
 // Minimal cache-first service worker so the app works offline once visited.
-const CACHE = "lemooneter-v17";
+const CACHE = "lemooneter-v18";
 const ASSETS = [
   "./",
   "./index.html",
