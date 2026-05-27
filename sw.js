@@ -1,5 +1,5 @@
 // Minimal cache-first service worker so the app works offline once visited.
-const CACHE = "lemooneter-v18";
+const CACHE = "lemooneter-v19";
 const ASSETS = [
   "./",
   "./index.html",
@@ -7,8 +7,9 @@ const ASSETS = [
   "./app.js",
   "./astro.js",
   "./manifest.webmanifest",
-  "./icon.svg",
-  "./icon-maskable.svg",
+  "./icon-192.png",
+  "./icon-512.png",
+  "./icon-512-maskable.png",
   "./fruits/moon.webp",
   "./fruits/lemon.webp",
   "./fruits/lime.webp",
