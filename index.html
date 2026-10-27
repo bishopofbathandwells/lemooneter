@@ -23,7 +23,7 @@
   </div>
 </header>
 
-<main id="pager" class="pager">
+<main class="main-view">
   <section class="page" id="todayPage" aria-label="Today">
     <div class="today-wrap">
       <canvas id="todayCanvas" width="1024" height="1024" aria-label="Current phase"></canvas>
@@ -32,12 +32,11 @@
         <div id="illumPct" class="illum">— %</div>
         <div class="day-nav">
           <button id="prevDay" class="icon-btn" aria-label="Previous day">‹</button>
-          <button id="dateBtn" class="date-btn" type="button" aria-label="Pick a date">
+          <button id="dateBtn" class="date-btn" type="button" aria-label="Pick a date" aria-haspopup="dialog" aria-controls="calendarDlg">
             <span id="todayDate" class="date">—</span>
           </button>
           <button id="todayDayBtn" class="cal-today-btn" type="button">Today</button>
           <button id="nextDay" class="icon-btn" aria-label="Next day">›</button>
-          <input type="date" id="dateInput" class="hidden-date-input" tabindex="-1" aria-hidden="true">
         </div>
         <div class="counters">
           <div><span class="count-label">Next full</span><span id="nextFull">—</span></div>
@@ -56,26 +55,34 @@
     </div>
   </section>
 
-  <section class="page" id="calendarPage" aria-label="Calendar">
+</main>
+
+<dialog id="calendarDlg" class="calendar-dialog" aria-labelledby="calendarTitle" aria-describedby="calendarHint">
+  <div class="calendar-title">
+    <h2 id="calendarTitle">Choose a date</h2>
+    <button id="closeCalendar" class="icon-btn" type="button" aria-label="Close date picker">×</button>
+  </div>
+  <p id="calendarHint" class="muted">Tap a day to select · Swipe left or right to change month</p>
+  <section id="calendarPage" aria-label="Monthly phases">
     <div class="cal-sticky">
       <div class="cal-head">
         <button id="prevMonth" class="icon-btn" aria-label="Previous month">‹</button>
-        <h2 id="monthLabel">—</h2>
+        <h2><button id="monthJumpToggle" class="month-jump-toggle" type="button" aria-expanded="false" aria-controls="monthJump"><span id="monthLabel" aria-live="polite" aria-atomic="true">—</span><span aria-hidden="true"> ▾</span></button></h2>
         <button id="todayBtn" class="cal-today-btn">Today</button>
         <button id="nextMonth" class="icon-btn" aria-label="Next month">›</button>
       </div>
+      <form id="monthJump" class="month-jump" hidden>
+        <label>Month<select id="jumpMonth" name="month"></select></label>
+        <label>Year<input id="jumpYear" name="year" type="number" inputmode="numeric" min="100" max="9999" step="1" required></label>
+        <button class="cal-today-btn" type="submit">Go</button>
+      </form>
       <div class="cal-dow">
         <span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span>
       </div>
     </div>
     <div id="calGrid" class="cal-grid"></div>
   </section>
-</main>
-
-<nav class="dots" role="tablist">
-  <button class="dot active" data-page="0" aria-label="Today"></button>
-  <button class="dot" data-page="1" aria-label="Calendar"></button>
-</nav>
+</dialog>
 
 <dialog id="settingsDlg" class="settings">
   <form method="dialog">

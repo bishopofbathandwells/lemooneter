@@ -4,7 +4,7 @@
 
 Lemooneter ("It's Fruitometry!") recreates an older Symbian moon-phase app. It is a vanilla HTML/CSS/JavaScript PWA with ES modules, no framework, no npm dependencies, and no build step. Preserve that simplicity unless a requirement justifies changing it. Prefer the PWA; native packaging was discussed and parked.
 
-- `index.html`: markup and settings dialogs.
+- `index.html`: main view, calendar date-picker dialog and settings dialog.
 - `app.css`: styling and responsive layout.
 - `app.js`: UI, state, canvas rendering, photo cropping, calendar, autoplay.
 - `astro.js`: pure astronomy math, also imported by `tests.html`.
@@ -39,13 +39,13 @@ State is in `localStorage`: `lm.mode`, `lm.photo`, `lm.lat`, `lm.lon`, `lm.cropX
 
 If a fix fails, pause and investigate the observed symptom before patching again. Document two or three distinct approaches with tradeoffs; use parallel agents only when authorized by the current session or applicable instructions. For persistent visual bugs, inspect a current reproduction or screenshot. The historical halo bug took several failed patches before the shading/alpha boundary was identified.
 
-## Historical handoff and pending work
+## Current interaction and remaining checks
 
 Recovered from Claude memory dated 26 May 2026 and the session stored under `C:/Users/zahir/.claude/projects/D--tmp-claude/`. The old working copy was `D:/tmp/claude/lemooneter`. Treat historical backlog items as leads to verify against current code, not proof of current defects.
 
-- The later session requested a single main screen in place of the separate swipe page. The cloned repository still has a Today/Calendar pager. This is a pending historical request, not authorization to implement it during unrelated work.
-- Lemon-photo PNG icons at 192 and 512 px, including a maskable icon, are already committed. Older README/memory statements saying only SVG icons exist are stale.
+- The main date button opens the phase-calendar date-picker dialog. Selecting a day updates the main view and closes it. Calendar swipes browse months; main-view swipes browse days (left advances, right goes back). Tap the month/year heading to jump to another month/year. Preserve cancellation without selection, distinct today/selected states, keyboard navigation with visible focus below the sticky header, focus return, and vertical scrolling on short screens. Use calendarDate() for calendar arithmetic so years below 100 are not remapped to 1900–1999.
+- Lemon-photo PNG icons at 192 and 512 px, including a maskable icon, are present; the 512 px icon is also used for apple-touch-icon.
 - Previously noted follow-ups: verify moon-photo licensing and attribution (the notes identify Gregory H. Revera's FullMoon2010 image), real-device iOS Safari testing, an update-available hint, failed-image handling, accessibility, lazy loading, more accurate phase math, and sharing the rendered image. Recheck each before acting.
 - Android installation was reported working during the original development; that is historical user feedback, not current cross-device verification.
 
-See `README.md` for more background, but check its claims against the implementation because some release notes predate the final icon change.
+See `README.md` for usage, architecture, limitations and deployment.

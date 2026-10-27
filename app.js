@@ -366,21 +366,33 @@ function renderRiseSet(now) {
   `;
 }
 
+// Unlike the multi-argument Date constructor, setFullYear preserves years 0–99.
+function calendarDate(year, month, day = 1) {
+  const date = new Date(0);
+  date.setHours(12, 0, 0, 0);
+  date.setFullYear(year, month, day);
+  return date;
+}
+
 function renderCalendar() {
   const today = new Date();
   if (!state.calMonth) state.calMonth = { y: today.getFullYear(), m: today.getMonth() };
   const { y, m } = state.calMonth;
-  const first = new Date(y, m, 1);
+  const first = calendarDate(y, m, 1);
   const monthLabel = first.toLocaleDateString(undefined, { month: "long", year: "numeric" });
   $("#monthLabel").textContent = monthLabel;
+  $("#monthJumpToggle").setAttribute("aria-label", monthLabel + ", choose month and year");
+  $("#jumpMonth").value = String(m);
+  $("#jumpYear").value = String(y);
 
   // Start of grid: Monday on/before the 1st.
   const dow = (first.getDay() + 6) % 7; // 0=Mon
-  const start = new Date(y, m, 1 - dow);
+  const start = calendarDate(y, m, 1 - dow);
   const grid = $("#calGrid");
   grid.innerHTML = "";
 
   const todayKey = today.toDateString();
+  const selectedKey = viewedDateOrNow().toDateString();
   const EVENT_LABELS = {
     0:    { txt: "New",  cls: "ev-new" },
     0.25: { txt: "1Q",   cls: "ev-q1"  },
@@ -388,13 +400,23 @@ function renderCalendar() {
     0.75: { txt: "3Q",   cls: "ev-q3"  },
   };
   for (let i = 0; i < 42; i++) {
-    const d = new Date(start.getFullYear(), start.getMonth(), start.getDate() + i);
+    const d = calendarDate(start.getFullYear(), start.getMonth(), start.getDate() + i);
     const inMonth = d.getMonth() === m;
-    const cell = document.createElement("div");
+    const cell = document.createElement("button");
+    cell.type = "button";
     cell.className = "cal-cell" + (inMonth ? "" : " muted") + (d.toDateString() === todayKey ? " today" : "");
+    const selected = d.toDateString() === selectedKey;
+    cell.classList.toggle("selected", selected);
+    cell.setAttribute("aria-pressed", String(selected));
+    if (d.toDateString() === todayKey) cell.setAttribute("aria-current", "date");
+    cell.setAttribute("aria-label", d.toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long", year: "numeric" }) + ", " + phaseName(moonPhaseFraction(calendarDate(d.getFullYear(), d.getMonth(), d.getDate()))));
+    cell.dataset.date = ymdString(d);
+    cell.tabIndex = -1;
+    cell.addEventListener("click", () => { setViewedDate(d); $("#calendarDlg").close(); });
     const c = document.createElement("canvas");
+    c.setAttribute("aria-hidden", "true");
     c.width = 256; c.height = 256;
-    const noonish = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 12);
+    const noonish = calendarDate(d.getFullYear(), d.getMonth(), d.getDate());
     renderPhaseTo(c, moonPhaseFraction(noonish), state.mode, state.customImage, state.builtIn);
     cell.appendChild(c);
     const num = document.createElement("div");
@@ -411,28 +433,11 @@ function renderCalendar() {
     grid.appendChild(cell);
   }
 
-  if (isOnCurrentMonth() && isCalendarVisible()) {
-    requestAnimationFrame(() => scrollTodayIntoView("auto"));
-  }
+  const focusCell = grid.querySelector(".selected") || grid.querySelector(".cal-cell:not(.muted)");
+  if (focusCell) focusCell.tabIndex = 0;
 }
 
-function isOnCurrentMonth() {
-  if (!state.calMonth) return false;
-  const t = new Date();
-  return state.calMonth.y === t.getFullYear() && state.calMonth.m === t.getMonth();
-}
-
-function isCalendarVisible() {
-  const p = $("#pager");
-  return p && Math.round(p.scrollLeft / p.clientWidth) === 1;
-}
-
-function scrollTodayIntoView(behavior = "smooth") {
-  const cell = document.querySelector(".cal-cell.today");
-  if (cell) cell.scrollIntoView({ behavior, block: "center", inline: "nearest" });
-}
-
-function renderAll() { renderToday(); renderCalendar(); }
+function renderAll() { renderToday(); if ($("#calendarDlg").open) renderCalendar(); }
 
 // ───────────────────────────────────────────────────────── DOM glue
 
@@ -479,29 +484,6 @@ function setupSubjectSelect() {
   }
   sel.value = state.mode;
   sel.addEventListener("change", () => setMode(sel.value));
-}
-
-function setupPager() {
-  const pager = $("#pager");
-  const dots = $$(".dot");
-  let settleTimer = null;
-  pager.addEventListener("scroll", () => {
-    const idx = Math.round(pager.scrollLeft / pager.clientWidth);
-    dots.forEach((d, i) => d.classList.toggle("active", i === idx));
-    clearTimeout(settleTimer);
-    settleTimer = setTimeout(() => {
-      // After scroll settles, if calendar is now in view and we're on the
-      // current month, centre today.
-      if (Math.round(pager.scrollLeft / pager.clientWidth) === 1 && isOnCurrentMonth()) {
-        scrollTodayIntoView();
-      }
-    }, 180);
-  });
-  dots.forEach((d, i) => {
-    d.addEventListener("click", () => {
-      pager.scrollTo({ left: i * pager.clientWidth, behavior: "smooth" });
-    });
-  });
 }
 
 function setupSettings() {
@@ -773,10 +755,50 @@ function setViewedDate(date) {
 }
 
 function ymdString(d) {
-  const y = d.getFullYear();
+  const y = String(d.getFullYear()).padStart(4, "0");
   const m = String(d.getMonth() + 1).padStart(2, "0");
   const dd = String(d.getDate()).padStart(2, "0");
   return `${y}-${m}-${dd}`;
+}
+
+function setupDaySwipe() {
+  const surface = $("#todayPage");
+  let gesture = null;
+  let suppressClickUntil = 0;
+  surface.addEventListener("pointerdown", e => {
+    // Controls keep their normal tap/drag behavior.
+    if (!e.isPrimary || e.button !== 0 || e.target.closest("button, input, select, textarea, a")) {
+      gesture = null;
+      return;
+    }
+    gesture = { id: e.pointerId, x: e.clientX, y: e.clientY };
+  });
+  surface.addEventListener("pointermove", e => {
+    if (!gesture || gesture.id !== e.pointerId) return;
+    const dx = Math.abs(e.clientX - gesture.x), dy = Math.abs(e.clientY - gesture.y);
+    if (dy > 12 && dy > dx) { gesture = null; return; }
+    if (dx > 12 && dx > dy * 1.4) {
+      surface.setPointerCapture(e.pointerId);
+      suppressClickUntil = performance.now() + 500;
+    }
+  });
+  surface.addEventListener("pointerup", e => {
+    if (!gesture || gesture.id !== e.pointerId) return;
+    const dx = e.clientX - gesture.x, dy = e.clientY - gesture.y;
+    gesture = null;
+    if (Math.abs(dx) >= 50 && Math.abs(dx) > Math.abs(dy) * 1.4) {
+      suppressClickUntil = performance.now() + 350;
+      stopAutoplay();
+      shiftViewedDay(dx < 0 ? 1 : -1);
+    }
+  });
+  surface.addEventListener("pointercancel", () => { gesture = null; });
+  surface.addEventListener("click", e => {
+    if (e.detail !== 0 && performance.now() < suppressClickUntil) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+  }, true);
 }
 
 function setupDayNav() {
@@ -784,17 +806,15 @@ function setupDayNav() {
   $("#nextDay").addEventListener("click", () => { stopAutoplay(); shiftViewedDay(1); });
   $("#todayDayBtn").addEventListener("click", () => { stopAutoplay(); setViewedDate(null); });
 
-  const inp = $("#dateInput");
   $("#dateBtn").addEventListener("click", () => {
     stopAutoplay();
-    inp.value = ymdString(viewedDateOrNow());
-    if (typeof inp.showPicker === "function") inp.showPicker();
-    else inp.focus();
-  });
-  inp.addEventListener("change", () => {
-    if (!inp.value) return;
-    const [y, m, d] = inp.value.split("-").map(Number);
-    setViewedDate(new Date(y, m - 1, d));
+    const d = viewedDateOrNow();
+    state.calMonth = { y: d.getFullYear(), m: d.getMonth() };
+    $("#monthJump").hidden = true;
+    $("#monthJumpToggle").setAttribute("aria-expanded", "false");
+    renderCalendar();
+    $("#calendarDlg").showModal();
+    focusCalendarCell($("#calGrid [tabindex='0']"));
   });
 
   $("#autoplayBtn").addEventListener("click", toggleAutoplay);
@@ -844,35 +864,152 @@ function stopAutoplay() {
   syncAutoplayButton();
 }
 
+function changeCalendarMonth(delta, focusDay = null) {
+  const { y, m } = state.calMonth;
+  const next = calendarDate(y, m + delta, 1);
+  state.calMonth = { y: next.getFullYear(), m: next.getMonth() };
+  renderCalendar();
+  if (focusDay != null) {
+    const date = calendarDate(next.getFullYear(), next.getMonth(), Math.min(focusDay, calendarDate(next.getFullYear(), next.getMonth() + 1, 0).getDate()));
+    focusCalendarDate(date);
+  }
+}
+
+function focusCalendarCell(cell) {
+  if (!cell) return;
+  cell.focus({ preventScroll: true });
+  // Native focus scrolling does not account for the sticky month header.
+  const dlg = $("#calendarDlg");
+  const bounds = dlg.getBoundingClientRect();
+  const header = dlg.querySelector(".cal-sticky").getBoundingClientRect();
+  const rect = cell.getBoundingClientRect();
+  const top = Math.max(bounds.top, header.bottom) + 6;
+  const bottom = bounds.bottom - 12;
+  if (rect.top < top) dlg.scrollTop += rect.top - top;
+  else if (rect.bottom > bottom) dlg.scrollTop += rect.bottom - bottom;
+}
+
+function focusCalendarDate(date) {
+  const grid = $("#calGrid");
+  const cell = grid.querySelector('[data-date="' + ymdString(date) + '"]');
+  if (cell) {
+    grid.querySelectorAll("button").forEach(b => b.tabIndex = -1);
+    cell.tabIndex = 0;
+    focusCalendarCell(cell);
+  }
+}
+
 function setupCalendarNav() {
-  $("#prevMonth").addEventListener("click", () => {
-    const { y, m } = state.calMonth;
-    state.calMonth = m === 0 ? { y: y - 1, m: 11 } : { y, m: m - 1 };
+  const dlg = $("#calendarDlg");
+  const grid = $("#calGrid");
+  const jump = $("#monthJump");
+  const toggle = $("#monthJumpToggle");
+  for (let m = 0; m < 12; m++) {
+    const option = document.createElement("option");
+    option.value = String(m);
+    option.textContent = new Date(2000, m, 1).toLocaleDateString(undefined, { month: "long" });
+    $("#jumpMonth").appendChild(option);
+  }
+  toggle.addEventListener("click", () => {
+    jump.hidden = !jump.hidden;
+    toggle.setAttribute("aria-expanded", String(!jump.hidden));
+    if (!jump.hidden) {
+      $("#jumpMonth").value = String(state.calMonth.m);
+      $("#jumpYear").value = String(state.calMonth.y);
+      $("#jumpYear").focus();
+      $("#jumpYear").select();
+    }
+  });
+  jump.addEventListener("submit", e => {
+    e.preventDefault();
+    if (!jump.reportValidity()) return;
+    state.calMonth = { y: Number($("#jumpYear").value), m: Number($("#jumpMonth").value) };
+    jump.hidden = true;
+    toggle.setAttribute("aria-expanded", "false");
     renderCalendar();
+    focusCalendarCell($("#calGrid [tabindex='0']"));
   });
-  $("#nextMonth").addEventListener("click", () => {
-    const { y, m } = state.calMonth;
-    state.calMonth = m === 11 ? { y: y + 1, m: 0 } : { y, m: m + 1 };
-    renderCalendar();
+  $("#prevMonth").addEventListener("click", () => changeCalendarMonth(-1));
+  $("#nextMonth").addEventListener("click", () => changeCalendarMonth(1));
+  $("#todayBtn").addEventListener("click", () => { setViewedDate(null); dlg.close(); });
+  $("#closeCalendar").addEventListener("click", () => dlg.close());
+  dlg.addEventListener("close", () => $("#dateBtn").focus({ preventScroll: true }));
+  let backdropDown = false;
+  const outside = e => {
+    const r = dlg.getBoundingClientRect();
+    return e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom;
+  };
+  dlg.addEventListener("pointerdown", e => { backdropDown = e.target === dlg && outside(e); });
+  dlg.addEventListener("click", e => { if (backdropDown && e.target === dlg && outside(e)) dlg.close(); backdropDown = false; });
+
+  grid.addEventListener("keydown", e => {
+    const cell = e.target.closest("[data-date]");
+    if (!cell || e.altKey || e.ctrlKey || e.metaKey) return;
+    const [y, m, day] = cell.dataset.date.split("-").map(Number);
+    const date = calendarDate(y, m - 1, day);
+    const delta = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -7, ArrowDown: 7 }[e.key];
+    if (e.key === "PageUp" || e.key === "PageDown") {
+      e.preventDefault();
+      changeCalendarMonth(e.key === "PageUp" ? -1 : 1, day);
+      return;
+    }
+    if (delta == null && e.key !== "Home" && e.key !== "End") return;
+    e.preventDefault();
+    const weekday = (date.getDay() + 6) % 7;
+    date.setDate(day + (delta ?? (e.key === "Home" ? -weekday : 6 - weekday)));
+    if (date.getFullYear() !== state.calMonth.y || date.getMonth() !== state.calMonth.m) {
+      state.calMonth = { y: date.getFullYear(), m: date.getMonth() };
+      renderCalendar();
+    }
+    focusCalendarDate(date);
   });
-  $("#todayBtn").addEventListener("click", () => {
-    const t = new Date();
-    state.calMonth = { y: t.getFullYear(), m: t.getMonth() };
-    renderCalendar();                                      // hides button, re-renders cells
-    requestAnimationFrame(() => scrollTodayIntoView());    // smooth scroll to today
+
+  // A horizontal gesture changes one month. Vertical gestures remain native
+  // scrolling; never interpret a swipe's trailing click as a date selection.
+  const surface = $("#calendarPage");
+  let gesture = null;
+  let suppressClickUntil = 0;
+  surface.addEventListener("pointerdown", e => {
+    if (!e.isPrimary || e.button !== 0) { gesture = null; return; }
+    gesture = { id: e.pointerId, x: e.clientX, y: e.clientY };
   });
+  surface.addEventListener("pointermove", e => {
+    if (!gesture || gesture.id !== e.pointerId) return;
+    const dx = Math.abs(e.clientX - gesture.x), dy = Math.abs(e.clientY - gesture.y);
+    if (dy > 12 && dy > dx) { gesture = null; return; }
+    if (dx > 12 && dx > dy * 1.4) {
+      surface.setPointerCapture(e.pointerId);
+      suppressClickUntil = performance.now() + 500;
+    }
+  });
+  surface.addEventListener("pointerup", e => {
+    if (!gesture || gesture.id !== e.pointerId) return;
+    const dx = e.clientX - gesture.x, dy = e.clientY - gesture.y;
+    gesture = null;
+    if (Math.abs(dx) >= 50 && Math.abs(dx) > Math.abs(dy) * 1.4) {
+      suppressClickUntil = performance.now() + 350;
+      changeCalendarMonth(dx < 0 ? 1 : -1);
+    }
+  });
+  surface.addEventListener("pointercancel", () => { gesture = null; });
+  surface.addEventListener("click", e => {
+    if (e.detail !== 0 && performance.now() < suppressClickUntil) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+  }, true);
 }
 
 // ───────────────────────────────────────────────────────── boot
 
 (async function init() {
   await Promise.all([loadCustomImage(), loadBuiltInAssets()]);
-  setupPager();
   setupSubjectSelect();
   setupSettings();
   setupCropPreview();
   setupCalendarNav();
   setupDayNav();
+  setupDaySwipe();
   renderAll();
 
   // Refresh time-sensitive bits every minute, but only when actually viewing

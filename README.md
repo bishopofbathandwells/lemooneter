@@ -23,23 +23,26 @@ Updates are automatic: every `git push` triggers a GitHub Pages redeploy within 
 
 ## Features
 
-### Today view (left page)
+### Main view
+- **Day swipes** — swipe left on the main moon/phase area for the next day, or right for the previous day. A manual swipe pauses autoplay; vertical scrolling and control taps remain available.
 - **Large phase render** — the chosen subject (moon / fruit / custom) shown at ~420 px with the current lunar phase applied as Lambertian shading.
 - **Phase name + % illuminated** (Waxing crescent, First quarter, Waxing gibbous, …).
-- **Day navigation bar** below the phase info: `‹` / *interactive date* / **Today** / `›` plus a hidden native `<input type="date">` that the date label opens via `showPicker()`.
+- **Day navigation bar** below the phase info: `‹` / *interactive date* / **Today** / `›`; the date label opens the custom monthly phase-calendar dialog.
 - **Counters card** with three columns:
   - **Next full** — countdown from the currently viewed date.
   - **Next new** — same.
   - **Autoplay** — pill button (`▶ N d`) that cycles `viewedDate → viewedDate+N → viewedDate` looping. Anchors at the user's currently viewed date, not always today. Configurable in Settings.
 - **Rise / Set times** — once the user grants geolocation, shows moonrise and moonset for the viewed date. Adapted from SunCalc-style Meeus formulas; accuracy ~1 minute.
 
-### Calendar view (right page, swipe or dot)
-- **Monthly grid**, 7 columns × 6 rows. Each cell renders the subject at its phase for that day.
-- **Capped at 900 px wide** and centred on desktop so cells stay readable on 4K monitors.
-- **Page-internal vertical scroll** — the page itself is the scroll container, not the document, so the calendar doesn't push other UI around.
-- **Sticky header** containing `‹ month-label Today ›` — pins to the top as you scroll the grid.
-- **Today highlight** — accent-yellow border, soft outer glow, and accent-coloured day number.
-- **Auto-scroll** — when the calendar becomes the active page (after pager scroll settles) and you're on the current month, today's cell scrolls into the centre.
+### Phase-calendar date picker
+- Press the date on the main view to open the existing monthly phase calendar in a modal dialog, replacing the browser's native date chooser.
+- Tap a day, including an adjacent-month day, to update the main view and close the picker. Opening it again shows the selected month.
+- Tap the month/year heading to choose a month and type a year (100–9999), then press Go. This browses the calendar without changing the selected date until a day is chosen.
+- Swipe left for the next month or right for the previous month; arrow buttons remain available. Vertical scrolling stays available on short screens.
+- The selected date has a tinted tile and filled date badge; today has an accent outline. The Today button selects the current date and closes the picker.
+- Close, Escape or a backdrop tap dismisses without changing the viewed date. Focus returns to the main date button.
+- Keyboard: arrow keys move by day/week, Home/End move to the week's edges, Page Up/Down browse months, and Enter/Space selects. Tab moves between the calendar and other dialog controls.
+- Opening the picker pauses autoplay. Keyboard focus stays visible while navigating on short screens.
 
 ### Subject selector (top bar)
 - Quick `<select>` dropdown next to the settings gear. One-click switch between Moon / Lemon / Lime / Orange / Cheese moon / Smiley / Watermelon / Custom photo.
@@ -67,7 +70,7 @@ Updates are automatic: every `git push` triggers a GitHub Pages redeploy within 
 
 | Layer | Choice | Why |
 |---|---|---|
-| Frontend | Vanilla HTML/CSS/JS, ES modules | No build, simple deploy, works from `file://` for quick testing |
+| Frontend | Vanilla HTML/CSS/JS, ES modules | No build, simple deploy, served over local HTTP for development |
 | Rendering | Canvas 2D, per-pixel Lambertian | Same path for moon / fruits / custom photos |
 | Image preprocessing | Python (Pillow, NumPy, SciPy) | Offline pipeline run by hand; not part of runtime |
 | Storage | `localStorage` | All state: mode, custom photo + crop, location, autoplay config |
@@ -90,8 +93,9 @@ lemooneter/
 ├── tests.html                   (browser-runnable phase-math tests)
 ├── manifest.webmanifest         (PWA manifest)
 ├── sw.js                        (service worker — cache-first shell)
-├── icon.svg                     (PWA / favicon)
-├── icon-maskable.svg            (Android adaptive icon)
+├── icon-192.png                 (PWA icon)
+├── icon-512.png                 (PWA / favicon / apple-touch-icon)
+├── icon-512-maskable.png        (maskable PWA icon)
 ├── tools/
 │   └── prepare_image.py         (offline image preprocessing — black-bg source → WebP)
 └── fruits/                      (processed runtime assets)
@@ -190,7 +194,6 @@ A few things to know:
 
 - **Custom-photo lighting compounding** — the Lambertian shader assumes the source is uniformly / front-lit. A photo with directional studio lighting (e.g., the old clementine shot) will compound that lighting with our shading and look wrong on the lit side. No fix without normal-map estimation.
 - **`localStorage` quota** — typical 5-10 MB. The downsize-on-upload (max 3072 px, JPEG q=0.92) usually lands ~1 MB; we catch the `QuotaExceededError` and alert the user but the photo is then session-only.
-- **`showPicker()`** isn't on older Safari; falls back to focusing the input, which doesn't always open the picker on those browsers.
 - **Calendar dates beyond ~2100** are fine but the moon math drifts over centuries (no perturbation terms).
 - **Custom-photo bbox is not detected** — Lambertian uses the whole disc, so any background in the photo gets shaded along with the subject.
 - **`localStorage` eviction** — Chrome/Edge can evict storage from inactive origins (Storage Pressure or Storage Buckets policies; rough rule: ~60 days of disuse without `navigator.storage.persist()`). The custom photo and crop settings live in `localStorage`, so a long-dormant install may reset to defaults.
@@ -200,7 +203,6 @@ A few things to know:
 ## What's left for "release"
 
 ### Must
-- [ ] **Full PWA icon set** — currently just `icon.svg` and `icon-maskable.svg`. Add raster PNGs at 192, 256, 384, 512 px in the manifest. iOS needs `apple-touch-icon` at multiple sizes (180, 152, 120). Android adaptive icon needs separate foreground + background.
 - [ ] **Photo attribution** — the full moon photo (`raw-fruits/moon.jpg`) is Wikipedia's `1280px-FullMoon2010.jpg`; check the licence and credit Gregory H. Revera (the original photographer) per the CC-BY-SA terms.
 - [ ] **iOS Safari real-device testing** — Android Chrome confirmed working. iPhone Safari install + use still pending.
 
@@ -285,17 +287,19 @@ If a friend installed the PWA and isn't seeing your latest changes, ask them to 
 
 Originally requested as a recreation of a Symbian/early-Android app called *Lemooneter* (a moon-phase tracker with a lemon-image swap). Built up iteratively over a single session:
 
-1. PWA scaffold + Today / Calendar pager.
+1. Initial PWA scaffold.
 2. Procedural moon, then real moon photo + crop-to-circle.
 3. Lemon mode with shape-fitted shadow.
 4. Clementine, then bee-orange.
 5. Lambertian shader replacing the hand-drawn ellipse-shadow approach (two sub-agents convened to diagnose halos and converged on padded ellipsoid + limb extrapolation).
 6. Black backgrounds + transparent PNGs + WebP encoding.
 7. New subject lineup (lime, cheese-moon, smiley, watermelon).
-8. Layout overhaul — capped widths, sticky calendar header, internal page scroll, auto-scroll to today.
+8. Responsive layout and calendar improvements.
 9. Subject dropdown in topbar.
 10. Custom-photo crop preview with drag-to-pan + wheel/pinch-zoom.
 11. Day navigation + autoplay.
 12. Southern-hemisphere toggle; new/quarter/full markers in the calendar; `astro.js` extraction + `tests.html`; `tools/prepare_image.py` committed.
 13. Squashed-canvas + long-date fixes on phones.
 14. **Pushed to GitHub and deployed to GitHub Pages** — <https://bishopofbathandwells.github.io/lemooneter/>.
+
+15. Phase-calendar date-picker dialog replaces the native date chooser and separate calendar page; month/year jumps, month swipes, accessible keyboard navigation, and main-view day swipes.
